@@ -1,3 +1,6 @@
+# Secrets - never commit the sudo password used for non-interactive runs
+.sudo_pass
+
 # Runtime artefacts - never commit machine state or experiment output
 logs/*
 !logs/.gitkeep
