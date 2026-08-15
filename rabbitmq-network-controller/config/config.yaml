@@ -6,7 +6,7 @@
 network:
   # Interface carrying RabbitMQ traffic. Use "auto" to pick the default-route
   # interface. Check with: ip -brief link show
-  interface: "eth0"
+  interface: "auto"
 
   # Shape inbound traffic too (producers -> broker) by redirecting only RabbitMQ
   # packets onto an IFB device. Set to false for egress-only shaping.
