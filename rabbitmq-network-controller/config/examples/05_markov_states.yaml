@@ -1,0 +1,39 @@
+# Example 5 - Markov link states (good / degraded / congested)
+#
+# The link spends most of its time in one state and occasionally transitions.
+# Row i of `transition` holds P(next = j | current = i) and must sum to 1.
+#
+#   state 0: 50 Mbit/s  "good"       stays good 90% of the time
+#   state 1: 20 Mbit/s  "degraded"
+#   state 2:  5 Mbit/s  "congested"
+#
+#   sudo python3 main.py start --config config/examples/05_markov_states.yaml
+
+network:
+  interface: "auto"
+  shape_ingress: true
+
+rabbitmq:
+  ports: [5672, 15672]
+
+bandwidth:
+  distribution: "markov"
+  min_mbps: 1
+  max_mbps: 100
+  update_interval_sec: 2
+  markov:
+    states_mbps: [50, 20, 5]
+    transition:
+      - [0.90, 0.08, 0.02]
+      - [0.20, 0.70, 0.10]
+      - [0.10, 0.30, 0.60]
+    start_state: 0
+    jitter_std_mbps: 1.5
+
+logging:
+  csv_file: "logs/markov_states.csv"
+  json_file: "logs/markov_states.json"
+
+runtime:
+  duration_sec: 1200
+  random_seed: 42

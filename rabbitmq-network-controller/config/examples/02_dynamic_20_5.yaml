@@ -1,0 +1,31 @@
+# Example 2 - dynamic 20 +/- 5 Mbit/s (the default experiment)
+#
+# bandwidth ~ N(20, 5) clamped to [1, 100], re-sampled and applied every second.
+# ~68% of samples land between 15 and 25 Mbit/s, ~95% between 10 and 30.
+#
+#   sudo python3 main.py start --config config/examples/02_dynamic_20_5.yaml
+
+network:
+  interface: "auto"
+  shape_ingress: true
+  classification: "fwmark"
+  shaper: "htb"
+
+rabbitmq:
+  ports: [5672, 15672]
+
+bandwidth:
+  distribution: "gaussian"
+  mean_mbps: 20
+  std_mbps: 5
+  min_mbps: 1
+  max_mbps: 100
+  update_interval_sec: 1
+
+logging:
+  csv_file: "logs/dynamic_20_5.csv"
+  json_file: "logs/dynamic_20_5.json"
+
+runtime:
+  duration_sec: 3600
+  random_seed: 42

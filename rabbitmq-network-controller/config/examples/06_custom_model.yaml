@@ -1,0 +1,36 @@
+# Example 6 - custom Python bandwidth generator
+#
+# `module` may be a dotted import path or a path to a .py file; `callable` is
+# either f(config, rng) -> float (called on every tick) or a generator function
+# f(config, rng) -> Iterator[float] (consumed lazily).
+#
+# See scripts/custom_model_example.py for a documented implementation
+# (a sawtooth / diurnal pattern with a random walk).
+#
+#   sudo python3 main.py start --config config/examples/06_custom_model.yaml
+
+network:
+  interface: "auto"
+  shape_ingress: true
+
+rabbitmq:
+  ports: [5672, 15672]
+
+bandwidth:
+  distribution: "custom"
+  mean_mbps: 25
+  std_mbps: 8
+  min_mbps: 2
+  max_mbps: 80
+  update_interval_sec: 1
+  custom:
+    module: "scripts/custom_model_example.py"
+    callable: "generate"
+
+logging:
+  csv_file: "logs/custom_model.csv"
+  json_file: "logs/custom_model.json"
+
+runtime:
+  duration_sec: 900
+  random_seed: 1234

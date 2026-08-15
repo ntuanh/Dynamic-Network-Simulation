@@ -1,0 +1,13 @@
+# RabbitMQ Network Controller - Python dependencies (Python 3.10+)
+#
+#   pip install -r requirements.txt
+#
+# The controller itself only needs PyYAML; matplotlib is used by
+# scripts/plot_bandwidth.py.  Everything else (traffic shaping, packet marking,
+# process control) is done through the standard library and the iproute2 /
+# iptables command line tools installed with the system package manager:
+#
+#   sudo apt install -y iproute2 iptables
+
+PyYAML>=6.0,<7.0
+matplotlib>=3.5,<4.0

@@ -1,0 +1,8 @@
+# Credentials / machine inventory - never commit
+info/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/

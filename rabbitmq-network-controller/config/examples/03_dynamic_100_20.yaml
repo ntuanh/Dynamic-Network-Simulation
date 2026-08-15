@@ -1,0 +1,42 @@
+# Example 3 - dynamic 100 +/- 20 Mbit/s with mild latency
+#
+# A fast but jittery link. netem adds 5 ms +/- 2 ms of delay on RabbitMQ traffic
+# only, which makes publisher-confirm round trips visible in your measurements.
+#
+# NOTE: on a 100 Mbit/s NIC set network.unshaped_ceil_mbps explicitly, otherwise
+# the auto-detected line rate and the RabbitMQ ceiling are identical and other
+# traffic competes for the same headroom.
+#
+#   sudo python3 main.py start --config config/examples/03_dynamic_100_20.yaml
+
+network:
+  interface: "auto"
+  shape_ingress: true
+  classification: "fwmark"
+  shaper: "htb"
+  latency_ms: 50
+
+rabbitmq:
+  ports: [5672, 15672]
+
+bandwidth:
+  distribution: "gaussian"
+  mean_mbps: 100
+  std_mbps: 20
+  min_mbps: 10
+  max_mbps: 200
+  update_interval_sec: 1
+
+netem:
+  enabled: true
+  delay_ms: 5
+  jitter_ms: 2
+  distribution: "normal"
+
+logging:
+  csv_file: "logs/dynamic_100_20.csv"
+  json_file: "logs/dynamic_100_20.json"
+
+runtime:
+  duration_sec: 1800
+  random_seed: 7

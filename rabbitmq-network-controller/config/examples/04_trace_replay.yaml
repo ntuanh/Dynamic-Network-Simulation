@@ -1,0 +1,40 @@
+# Example 4 - replay a recorded (real) network trace
+#
+# Reads one bandwidth value per line from a CSV file and applies them in order,
+# one per update_interval_sec. When the trace is exhausted it restarts (loop:
+# true) or holds the final value (loop: false).
+#
+# The trace file may be:
+#   * a CSV with headers, e.g. "timestamp,bandwidth_mbps" -> set `column`
+#   * a header-less file with one number per line
+#   * an earlier run's logs/bandwidth_history.csv (replay your own experiment!)
+#
+#   sudo python3 main.py start --config config/examples/04_trace_replay.yaml
+
+network:
+  interface: "auto"
+  shape_ingress: true
+  classification: "fwmark"
+  shaper: "htb"
+
+rabbitmq:
+  ports: [5672, 15672]
+
+bandwidth:
+  distribution: "trace"
+  min_mbps: 0.5
+  max_mbps: 500
+  update_interval_sec: 1
+  trace:
+    file: "config/examples/trace_example.csv"
+    column: "bandwidth_mbps"
+    loop: true
+    scale: 1.0
+
+logging:
+  csv_file: "logs/trace_replay.csv"
+  json_file: "logs/trace_replay.json"
+
+runtime:
+  duration_sec: 300
+  random_seed: null

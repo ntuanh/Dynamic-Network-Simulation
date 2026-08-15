@@ -1,0 +1,46 @@
+# RabbitMQ Network Controller - working configuration
+#
+# Every field is documented in ../example_config.yaml and in README.md ("C. Configuration").
+# Only the fields below are required; everything else falls back to a safe default.
+
+network:
+  # Interface carrying RabbitMQ traffic. Use "auto" to pick the default-route
+  # interface. Check with: ip -brief link show
+  interface: "eth0"
+
+  # Shape inbound traffic too (producers -> broker) by redirecting only RabbitMQ
+  # packets onto an IFB device. Set to false for egress-only shaping.
+  shape_ingress: true
+
+  # "fwmark" = iptables mangle marks + tc fw filter (recommended)
+  # "u32"    = pure tc port matching, no netfilter involved
+  classification: "fwmark"
+
+  # "htb" = hierarchical token bucket (recommended), "tbf" = token bucket filter
+  shaper: "htb"
+
+rabbitmq:
+  # ALL traffic on these TCP ports is shaped, regardless of queue, exchange,
+  # vhost, producer or consumer. No queue names or credentials are ever needed.
+  ports:
+    - 5672    # AMQP
+    - 15672   # management HTTP API / UI
+
+bandwidth:
+  distribution: "gaussian"      # constant | gaussian | uniform | lognormal | markov | trace | custom
+  mean_mbps: 20
+  std_mbps: 5
+  min_mbps: 1
+  max_mbps: 100
+  update_interval_sec: 1
+
+logging:
+  csv_file: "logs/bandwidth_history.csv"
+  json_file: "logs/bandwidth_history.json"
+  app_log_file: "logs/controller.log"
+  level: "INFO"
+
+runtime:
+  duration_sec: 3600            # 0 = run until stopped
+  random_seed: 42               # null = non-reproducible
+  verify_restore: true

@@ -1,0 +1,159 @@
+# =============================================================================
+# RabbitMQ Network Controller - annotated reference configuration
+# =============================================================================
+# Copy this file and edit it:
+#
+#   cp example_config.yaml config/config.yaml
+#   sudo python3 main.py start --config config/config.yaml
+#
+# Every key below shows its default value. All keys are optional except
+# network.interface and rabbitmq.ports (which also have sensible defaults).
+# Relative paths are resolved against the project root, never against the
+# current working directory - so `sudo` from any directory behaves the same.
+# =============================================================================
+
+network:
+  # ---------------------------------------------------------------- interface
+  # Interface that carries RabbitMQ traffic.
+  #   "auto"  -> the interface holding the default route (ip route show default)
+  #   "eth0"  -> explicit; list candidates with: ip -brief link show
+  #   "lo"    -> shape RabbitMQ traffic between processes on this same host
+  interface: "auto"
+
+  # ------------------------------------------------------------------ ingress
+  # Egress shaping (broker -> clients) is always applied. Inbound traffic
+  # (clients -> broker) cannot be queued directly by Linux, so when
+  # shape_ingress is true, ONLY RabbitMQ packets are mirrored onto an
+  # Intermediate Functional Block (IFB) device where the same limit is enforced.
+  # Requires the `ifb` and `act_mirred` kernel modules (present in every stock
+  # Ubuntu/Debian kernel). If they are missing, the controller logs a warning
+  # and continues with egress-only shaping.
+  shape_ingress: false
+  ifb_device: "ifb-rmq0"        # created at start, deleted at shutdown
+
+  # ----------------------------------------------------------- classification
+  # How RabbitMQ packets are recognised:
+  #   "fwmark" -> iptables -t mangle marks packets on the RabbitMQ ports and a
+  #               `tc ... fw` filter steers marked packets into the shaped class.
+  #               Robust, survives NAT, and works with any addressing.
+  #   "u32"    -> tc matches the TCP port fields directly. No netfilter needed
+  #               (useful on hosts without iptables), slightly less flexible.
+  classification: "fwmark"
+
+  # Firewall mark applied to RabbitMQ packets. Only the bits covered by fwmask
+  # are touched (--set-xmark MARK/MASK), so marks used by Docker, Kubernetes,
+  # WireGuard or policy routing are preserved. Change these if 0x2a/0xff clashes
+  # with something else on your host.
+  fwmark: 0x2a
+  fwmask: 0xff
+
+  # ------------------------------------------------------------------- shaper
+  #   "htb" -> classful hierarchical token bucket. RabbitMQ gets class 1:10 at
+  #            the dynamic rate; every other packet lands in the default class
+  #            1:99 which runs at line rate (i.e. is NOT shaped).
+  #   "tbf" -> `prio` root with 4 bands; the kernel's default priomap only uses
+  #            bands 1-3, so band 4 is reachable exclusively through our filters
+  #            and carries a tbf qdisc at the dynamic rate.
+  shaper: "htb"
+
+  # Queue latency budget for tbf and for htb burst sizing.
+  latency_ms: 50
+
+  # Leaf qdisc under the shaped class (fq_codel keeps latency low under load).
+  # Ignored when netem.enabled is true - netem becomes the leaf qdisc instead.
+  leaf_qdisc: "fq_codel"
+
+  # Ceiling applied to NON-RabbitMQ traffic, in Mbit/s. 0 = auto-detect from
+  # /sys/class/net/<iface>/speed and fall back to 10000 (10 Gbit/s) for virtual
+  # devices. Unrelated traffic is never delayed as long as this is >= link rate.
+  unshaped_ceil_mbps: 0
+
+  # Also install IPv6 rules (ip6tables marking + `protocol ipv6` tc filters).
+  enable_ipv6: true
+
+  # Refuse to start when the interface already has a non-default root qdisc
+  # (i.e. someone else is shaping it). Override per-run with --force.
+  protect_existing_qdisc: true
+
+rabbitmq:
+  # ALL traffic on these TCP ports is shaped - every queue, exchange, vhost,
+  # producer and consumer. The controller never talks to the broker, never
+  # reads its configuration and never needs credentials.
+  ports:
+    - 5672      # AMQP 0-9-1 / 1.0
+    - 15672     # management HTTP API and UI
+    # - 5671    # AMQPS (TLS)
+    # - 61613   # STOMP
+    # - 1883    # MQTT
+    # - 25672   # inter-node clustering (only shape this on purpose!)
+
+  # "both" shapes traffic where either the source or the destination port
+  # matches (recommended). "dst" or "src" restrict it to one direction.
+  match_direction: "both"
+
+bandwidth:
+  # constant | gaussian (alias: normal) | uniform | lognormal | markov | trace | custom
+  distribution: "gaussian"
+
+  mean_mbps: 20               # gaussian/lognormal mean, constant value
+  std_mbps: 5                 # gaussian/lognormal standard deviation
+  min_mbps: 1                 # hard clamp (must be > 0)
+  max_mbps: 100               # hard clamp
+  update_interval_sec: 1      # how often a new value is generated and applied
+  round_digits: 3             # rounding applied before the value reaches tc
+
+  # uniform only (defaults to [min_mbps, max_mbps])
+  # low_mbps: 10
+  # high_mbps: 30
+
+  # markov only - discrete link states with a transition matrix (rows sum to 1)
+  markov:
+    states_mbps: []           # e.g. [5, 20, 50]
+    transition: []            # e.g. [[0.8,0.2,0.0],[0.1,0.8,0.1],[0.0,0.3,0.7]]
+    start_state: 0
+    jitter_std_mbps: 0        # optional gaussian noise around the state value
+
+  # trace only - replay a recorded/real network trace
+  trace:
+    file: ""                  # e.g. "config/examples/trace_example.csv"
+    column: "bandwidth_mbps"  # column to read (header-less files use the last column)
+    loop: true                # restart from the beginning when exhausted
+    scale: 1.0                # multiply every value (e.g. 0.001 for kbit/s traces)
+
+  # custom only - your own Python generator
+  custom:
+    module: ""                # dotted path ("mypkg.models") or file ("scripts/my_model.py")
+    callable: "generate"      # f(config, rng) -> float, or a generator function
+
+# Optional impairment applied *in addition* to the bandwidth limit. netem is
+# attached as the leaf qdisc of the shaped class, so it only ever affects
+# RabbitMQ traffic.
+netem:
+  enabled: false
+  delay_ms: 0
+  jitter_ms: 0
+  loss_pct: 0
+  duplicate_pct: 0
+  reorder_pct: 0
+  distribution: ""            # "" | normal | pareto | paretonormal (jitter shape)
+
+logging:
+  csv_file: "logs/bandwidth_history.csv"          # timestamp,bandwidth_mbps,interface,status
+  json_file: "logs/bandwidth_history.json"        # same history + metadata and summary
+  app_log_file: "logs/controller.log"             # rotating application log
+  restoration_report_file: "logs/restoration_report.json"
+  level: "INFO"               # DEBUG | INFO | WARNING | ERROR | CRITICAL
+  console: true               # also log to stderr
+  max_bytes: 10485760         # rotate controller.log at 10 MiB
+  backup_count: 5
+  json_flush_every: 10        # rewrite the JSON history every N records
+
+runtime:
+  duration_sec: 3600          # 0 or null = run until stopped
+  random_seed: 42             # null = fresh randomness on every run
+  backup_dir: "runtime_backup"
+  state_file: "runtime_backup/state.json"
+  pid_file: "runtime_backup/controller.pid"
+  journal_file: "runtime_backup/rollback.json"    # crash-safe undo recipe
+  verify_restore: true        # compare the network state against the backup on exit
+  restore_timeout_sec: 30

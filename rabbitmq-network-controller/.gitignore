@@ -1,0 +1,17 @@
+# Runtime artefacts - never commit machine state or experiment output
+logs/*
+!logs/.gitkeep
+results/*
+!results/.gitkeep
+runtime_backup/*
+!runtime_backup/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/

@@ -1,0 +1,31 @@
+# Example 1 - stable 20 Mbit/s link
+#
+# A rock-steady limit: every update re-applies exactly 20 Mbit/s. Useful as the
+# control group of an experiment ("what does RabbitMQ do on a clean 20 Mbit/s
+# link?") before introducing variability.
+#
+#   sudo python3 main.py start --config config/examples/01_stable_20mbps.yaml
+
+network:
+  interface: "auto"
+  shape_ingress: true
+  classification: "fwmark"
+  shaper: "htb"
+
+rabbitmq:
+  ports: [5672, 15672]
+
+bandwidth:
+  distribution: "constant"
+  mean_mbps: 20
+  min_mbps: 1
+  max_mbps: 100
+  update_interval_sec: 5
+
+logging:
+  csv_file: "logs/stable_20mbps.csv"
+  json_file: "logs/stable_20mbps.json"
+
+runtime:
+  duration_sec: 600
+  random_seed: 42
